@@ -1,0 +1,94 @@
+@startuml
+title "Теплый Дом To-Be`" Container Diagram
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+Person(user, "Пользователь", "Пользователи")
+Person(admin, "Администратор", "Управление пользователями, управление Saas")
+Person(techUser, "Техподдержка", "Обработка запросов")
+
+System_Ext(webApp, "Фронт", "Аутсорс - функции управления устройствами и мониторинг")
+System_Ext(webAppAdmin, "Фронт администратора", "Аутсорс - функции управления пользователями, техподдержка")
+
+System_Ext(extDevices, "Датчики", "Контроллеры управления и измерения")
+
+System_Ext(Payment, "Payment System", "Внешний сервис оплаты")
+
+Container_Boundary(SmartHomeSystem, "Smart Home") {
+    Container(ApiGateway, "API Gateway")
+    SystemQueue(Queue, "Kafka Queue", "Очередь сообщений. Pub/Sub model")
+
+    Rel(user, webApp, "теплыйдом.рф")
+    Rel(admin, webAppAdmin, "админ.теплыйдом.рф")
+    Rel(techUser, webAppAdmin, "админ.теплыйдом.рф")
+    Rel(webAppAdmin, ApiGateway, "API")
+    Rel(webApp, ApiGateway, "API")
+    Rel(ApiGateway, webApp, "Телеметрия", "WebSocket")
+
+    Rel(ApiGateway, Queue, "Пользователи\n Проект дома\n Сценарии управления\n CRUD", "JSON", "user")
+    Rel(ApiGateway, Queue, "Команды\n управления", "JSON", "user")
+    Rel(Queue, ApiGateway, "Телеметрия", "JSON|ASYNC")
+
+    
+    Container_Boundary(DevicesSystem, "Smart home core") {
+        Container(DeviceExchangeService, "DeviceExchange Service", "Java", "Форматы обмена. Обмен с устройствами (чтение/команды)")
+        ContainerDb(DeviceExchangeDB, "DeviсeExchange DB", "PostgreSQL", "Информация о датчиках, адресация")
+
+        Container(DeviceScenarioService, "DeviceScenario Service", "Java", "Конфигурация и работа сценариев управления")
+        ContainerDb(DeviceScenarioDB, "DeviceScenario DB", "PostgreSQL", "Сценарии управления")
+
+        Container(TelemetryService, "TelemetryService", "Java", "Получение данных от датчиков")
+        ContainerDb(TelemetryDB, "Telemetry DB", "PostreSQL time series", "Архив телеметрии")
+
+        Container(UserProjectMonitoringService, "UserProjectService", "Java", "Конфигурирование проекта дома. Датчики, Котроллеры, схема отображения, сопоставление телеметрии и схемы")
+        ContainerDb(UserProjectMonitoringDB, "UserProject DB", "PostgreSQL", "Проект дома, схемы отображения")
+
+        Rel(Queue, DeviceExchangeService, "Команды\n управления", "JSON", "user,\n scenario")
+        Rel(Queue, DeviceExchangeService, "Конфигурая\n датчиков\n из проекта\n CRUD", "JSON", "UserProject")
+        Rel(DeviceExchangeService, Queue, "Телеметрия", "JSON|ASYNC", )
+        Rel(DeviceExchangeService, extDevices, "Команды\n управления", "DEVICE FORMAT", "user,\n scenario")
+        Rel(extDevices, DeviceExchangeService, "Телеметрия", "DEVICE FORMAT")
+        Rel(DeviceExchangeService, DeviceExchangeDB, "Конфигурая\n датчиков\n CRUD", "SQL")
+        Rel(DeviceScenarioService, Queue, "Команды\n управления", "JSON|ASYNC", "scenario")
+        Rel(Queue, DeviceScenarioService, "Сценарии\n управления\n CRUD", "JSON")
+        Rel(Queue, DeviceScenarioService, "Телеметрия", "JSON|ASYNC")
+        Rel(DeviceScenarioService, DeviceScenarioDB, "Сценарии\n управления\n CRUD", "SQL")
+
+        Rel(Queue, TelemetryService, "Телеметрия\n Запись/чтение архива", "JSON")
+        Rel(TelemetryService, TelemetryDB, "Write/Read", "SQL")
+
+        Rel(Queue, UserProjectMonitoringService, "Проект дома\n CRUD", "JSON")
+        Rel(UserProjectMonitoringService, UserProjectMonitoringDB, "Проект дома\n CRUD", "SQL")
+        Rel(UserProjectMonitoringService, Queue, "Конфигурая датчиков\n по проекту\n CRUD", "JSON")
+    }
+
+
+
+    Container_Boundary(UserSaasSystem, "UserSaas") {
+
+        Container(Auth, "Auth Service", "Авторизация, аутентификация")
+        Container(UserProfile, "UserProfile Service", "Java", "Управление профилями, хранение ")
+        ContainerDb(UserProfileDataBase, "UserProfile DB", "PostgreSQL", "Информация пользователей")
+
+        Container(PaymentService, "Payment Service\n EventSourcing", "Java", "Управление оплатами")
+        ContainerDb(PaymentDB, "Payment DB", "PostgreSQL time series", "Данные об оплатах")
+
+        Container(TechSupportService, "TechSupport Service", "Java", "Управление задачами техподдержки")
+        ContainerDb(TechSupportDB, "TechSupport DB", "MongoDB", "Тикеты техподдержки")
+
+        Rel(ApiGateway, Auth, "Авторизация\n проверка доступа", "JSON")
+        Rel(Queue, UserProfile, "Пользователи\n CRUD", "JSON")
+
+        Rel(UserProfile, UserProfileDataBase, "CRUD", "SQL")
+
+        Rel(PaymentService, PaymentDB, "Read/Write", "SQL")
+        Rel(PaymentService, Payment, "Проведение оплаты", "SQL")
+
+        Rel(Queue, TechSupportService, "Задачи\n техподдержки\n CRUD ", "JSON")
+        Rel(TechSupportService, TechSupportDB, "Write/Read")
+    }
+}
+
+@enduml

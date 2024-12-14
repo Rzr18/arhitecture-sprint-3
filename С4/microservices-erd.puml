@@ -1,0 +1,89 @@
+@startuml
+entity User {
+    + id
+    --
+    * name
+    * email
+    * password
+}
+
+entity Payment{
+    + id
+    + user_id
+    --
+    * value
+    * time
+}
+
+entity UserProject {
+    + id
+    + user_id
+    --
+    * name
+    * address
+    * schemaSVG
+}
+
+entity Device {
+    + id
+    + project_id
+    + type_id
+    --
+    * address
+    * protocol
+    }
+
+entity DevTelemetry{
+    +id
+    +device_id
+    --
+    *name
+    *valueType
+}
+
+entity DevCommand{
+    +id
+    +long device_id
+    --
+    *name
+    *parameters
+}
+
+entity DeviceType {
+    + id 
+    --
+    * name 
+}
+
+entity TelemetryValue {
+    + id
+    + device_id
+    --
+    * created_at
+    * value
+}
+
+
+entity ScenarioSchedule {
+    + id 
+    + project_id
+    --
+    * steps
+}
+
+UserProject ||--o{    Device
+
+Device ||--o| DeviceType
+Device ||--o{ DevTelemetry
+Device ||--o{ DevCommand
+Device ||--o{ TelemetryValue : "Формирует"
+
+ScenarioSchedule ||--o{    DevCommand
+ScenarioSchedule ||--o{    DevTelemetry
+ScenarioSchedule ||--o{    Device
+
+User ||--o{    UserProject
+
+User ||--o{ Payment 
+
+@enduml

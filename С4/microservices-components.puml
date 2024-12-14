@@ -1,0 +1,97 @@
+@startuml
+title "Теплый Дом To-Be CORE" Component Diagram
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+SystemQueue(Queue, "Kafka Queue", "Очередь сообщений. Pub/Sub model")
+
+System_Ext(extDevices, "Датчики", "Контроллеры управления и измерения")
+    
+    ContainerDb(DeviceExchangeDB, "DeviсeExchange DB", "PostgreSQL", "Информация о датчиках, адресация")
+    Container(DeviceExchangeService, "DeviceExchangeService") {
+        Boundary(ControllersDC, "DTO Layer"){
+        Component(DeviceConfigController, "DeviceConfigController", "")
+        Component(DeviceControlController, "DeviceControlController", "")
+        Component(TelemetryPublisher, "TelemetryPublisher", "")
+        }
+        Component(DeviceConfigRepository, "DeviceConfigRepository", "")
+
+        Component(DeviceReadWorker, "DeviceReadWorker", "Получение телеметрии в формате датчиков")
+        Component(DeviceControlWorker, "DeviceControlWorker", "Управление устройствами")
+
+        Rel(DeviceConfigController, DeviceConfigRepository, "Конфигурая\n датчиков\n CRUD") 
+        BiRel_D(DeviceConfigRepository, DeviceExchangeDB, "Конфигурая\n датчиков\n CRUD", "SQL")
+        Rel_U(DeviceConfigRepository, DeviceReadWorker, "Конфигурая\n датчиков\n")
+        Rel_U(DeviceConfigRepository, DeviceControlWorker, "Конфигурая\n контроллеров\n")
+        Rel(extDevices, DeviceReadWorker, "Телеметрия", "DEVICE FORMAT")
+        Rel(DeviceControlController, DeviceControlWorker, "Команды\n управления")
+        Rel(Queue, DeviceControlController, "Команды\n управления", "JSON", "user,\n scenario")
+        Rel(Queue, DeviceConfigController, "Конфигурая\n датчиков\n из проекта\n CRUD", "JSON", "UserProject")
+        Rel_U(DeviceReadWorker, TelemetryPublisher, "Телеметрия" )
+        Rel_U(TelemetryPublisher, Queue, "Телеметрия", "JSON|ASYNC" )
+        Rel_D(DeviceControlWorker, extDevices, "Команды\n управления", "DEVICE FORMAT", "user,\n scenario")   
+    }
+        
+
+    ContainerDb(DeviceScenarioDB, "DeviceScenario DB", "PostgreSQL", "Сценарии управления")
+    Container(DeviceScenarioService, "DeviceScenarioService") {
+        Boundary(ControllersDS, "DTO Layer"){
+        Component(CmndCtrlSender, "CmndCtrlSender", "Отправка команд")
+        Component(DeviceScenarioController, "DeviceScenarioController", "Обработка запросов CRUD")
+        Component(DevScenTelemetrySubscriber, "DevScenTelemetrySubscriber", "Обработка потока телеметрии")
+        }
+
+        Component(DeviceScenarioWorker, "DeviceScenarioWorker", "Анализ телеметрии, выполнение сценариев")
+        Component(DeviceScenarioRepository, "DeviceScenarioRepository", "Операции с БД")
+
+        Rel(Queue, DeviceScenarioController, "Сценарии\n управления\n CRUD", "JSON")
+        Rel(Queue, DevScenTelemetrySubscriber, "Телеметрия", "JSON|ASYNC")
+        Rel_D(DevScenTelemetrySubscriber, DeviceScenarioWorker, "Телеметрия")
+        Rel(DeviceScenarioController, DeviceScenarioRepository, "Сценарии\n управления\n CRUD")
+        Rel(DeviceScenarioRepository, DeviceScenarioDB, "Сценарии\n управления\n CRUD", "SQL")
+        Rel_U(DeviceScenarioRepository, DeviceScenarioWorker, "Сценарии\n управления")
+        Rel_U(DeviceScenarioWorker, CmndCtrlSender, "Команды\n управления")
+        Rel_U(CmndCtrlSender, Queue, "Команды\n управления", "JSON", "scenario")
+    }
+
+    ContainerDb(UserProjectMonitoringDB, "UserProject DB", "PostgreSQL", "Проект дома, схемы отображения")
+    Container(UserPojectService, "UserPojectService") {
+        Boundary(ControllersUP, "DTO Layer"){
+            Component(UserPojectController, "UserPojectController", "Обработка запросов CRUD")
+            Component(DeviceCfgSender, "DeviceCfgSender", "Передача конфигурации датчиков")
+        }
+        Component(UserPojectLogic, "UserPojectLogic", "Валидация схемы\n Формирование сущностей проекта\n Управление конфигурацией датчиков")
+        Component(UserPojectRepository, "UserPojectRepository", "Операции с БД")
+        
+        Lay_D(ControllersUP, UserPojectLogic)
+        Rel_D(Queue, UserPojectController, "Проект дома\n CRUD", "JSON")
+        Rel_D(UserPojectController, UserPojectLogic, "Проект дома\n CRUD")
+        Rel(UserPojectLogic, UserPojectRepository, "Проект дома\n CRUD")
+        Rel_D(UserPojectRepository, UserProjectMonitoringDB, "Проект дома\n CRUD", "SQL")
+        Rel(UserPojectLogic, DeviceCfgSender, "Конфигурая датчиков\n по проекту\n CRUD")
+        Rel(DeviceCfgSender, Queue, "Конфигурая датчиков\n по проекту\n CRUD", "JSON")
+    }
+
+    ContainerDb(TelemetryDB, "Telemetry DB", "PostreSQL time series", "Архив телеметрии")
+    Container(TelemetryService, "TelemetryService") {
+        Boundary(ControllersTM, "DTO Layer"){
+            Component(TelemetrySubscriber, "TelemetrySubscriber", "Обработка потока телеметрии")
+            Component(TelemetryController, "TelemetryController", "Обработка запросов архива")
+        }
+        Component(TelemetryRepository, "TelemetryRepository", "Операции с БД")
+
+        Rel(Queue, TelemetrySubscriber, "Телеметрия", "JSON|ASYNC")
+        BiRel(Queue, TelemetryController, "Телеметрия\n запрос архива", "JSON", )
+        Rel_U(TelemetryRepository, TelemetryController, "Чтение архива")
+        Rel_D(TelemetrySubscriber, TelemetryRepository, "Телеметрия запись")
+        BiRel(TelemetryRepository, TelemetryDB, "Write/Read", "SQL")
+        
+    }
+
+    Lay_D(Queue, UserPojectService)
+    
+
+
+@enduml
