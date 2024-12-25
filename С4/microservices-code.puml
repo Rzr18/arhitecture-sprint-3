@@ -1,0 +1,72 @@
+@startuml
+title DeviceExchange Service Code Diagram
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+class DevTelemetry{
+  +long id
+  +long device_id
+  +string name
+  +enum valueType
+}
+
+class DevCommand{
+  +long id
+  +long device_id
+  +string name
+  +string parameters
+}
+
+class Device {
+ +long id
+ +string name
+ +string address
+ +string protocol
+
+ +DevTelemetry[] telemetries
+ +DevCommand[] commands
+}
+
+class DeviceConfigController {
+  +Devices[] listDevices(long[])
+  +Device updateDevice(Device)
+  +Device createDevice(Device)
+  +void deleteDevice(long)  
+}
+
+class DeviceConfigRepository {
+  +Devices[] listDevices(long[])
+  +Device updateDevice(Device)
+  +Device createDevice(Device)
+  +void deleteDevice(long)  
+}
+
+class DeviceControlController {
+  +void Execute(long devId, long comandId)
+}
+
+class TelemetryValue{
+  long device_id
+  long id
+  time created_at
+}
+
+class TelemetryPublisher{
+  +void publish(TelemetryValue[])
+}
+
+
+class DeviceReadWorker {
+  +void init()
+  +void onTelemetryReceived()  
+}
+
+
+DeviceConfigController --> DeviceConfigRepository
+DeviceConfigRepository --> DeviceReadWorker
+DeviceReadWorker --> TelemetryPublisher
+
+
+@enduml

@@ -1,0 +1,100 @@
+@startuml
+title "Теплый Дом To-Be`" Container Diagram
+
+top to bottom direction
+
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Component.puml
+
+Person(user, "Пользователь", "Пользователи")
+Person(admin, "Администратор", "Управление пользователями, управление Saas")
+Person(techUser, "Техподдержка", "Обработка запросов")
+
+System_Ext(webMobileApp, "Мобильное приложение", "Аутсорс - функции управления устройствами и мониторинг")
+System_Ext(webApp, "Веб-сайт", "Аутсорс - функции управления устройствами и мониторинг")
+System_Ext(webAppAdmin, "Веб-сайт администратора", "Аутсорс - функции управления пользователями, техподдержка")
+
+System_Ext(extDevices, "Датчики", "Контроллеры управления и измерения")
+
+System_Ext(Payment, "Payment System", "Внешний сервис оплаты")
+
+Container_Boundary(SmartHomeSystem, "Smart Home") {
+    Container(ApiGateway, "API Gateway")
+    
+
+    Rel(user, webApp, "теплыйдом.рф")
+    Rel(user, webMobileApp, "")
+    Rel(admin, webAppAdmin, "админ.теплыйдом.рф")
+    Rel(techUser, webAppAdmin, "админ.теплыйдом.рф")
+    Rel_D(webAppAdmin, ApiGateway, "API", "HTTPS")
+    Rel_D(webApp, ApiGateway, "API", "HTTPS")
+    Rel(ApiGateway, webApp, "Телеметрия", "WebSocket")
+    Rel_D(webMobileApp, ApiGateway, "API", "HTTPS")
+    Rel(ApiGateway, webMobileApp, "Телеметрия", "WebSocket")
+
+    
+    
+    
+    Container_Boundary(DevicesSystem, "Smart home core") {
+        SystemQueue(Queue, "Kafka Queue", "Очередь сообщений. Pub/Sub model")
+        Rel(Queue, ApiGateway, "Телеметрия\n для мониторинга", "SUB")
+
+        Container(DeviceExchangeService, "DeviceExchange Service", "Java", "Форматы обмена. Обмен с устройствами (чтение/команды)")
+        ContainerDb(DeviceExchangeDB, "DeviсeExchange DB", "PostgreSQL", "Информация о датчиках, адресация")
+
+        Container(DeviceScenarioService, "DeviceScenario Service", "Java", "Конфигурация и работа сценариев управления")
+        ContainerDb(DeviceScenarioDB, "DeviceScenario DB", "PostgreSQL", "Сценарии управления")
+
+        Container(TelemetryService, "TelemetryService", "Java", "Получение данных от датчиков")
+        ContainerDb(TelemetryDB, "Telemetry DB", "PostreSQL time series", "Архив телеметрии")
+
+        Container(UserProjectMonitoringService, "UserProjectService", "Java", "Конфигурирование проекта дома. Датчики, Котроллеры, схема отображения, сопоставление телеметрии и схемы")
+        ContainerDb(UserProjectMonitoringDB, "UserProject DB", "PostgreSQL", "Проект дома, схемы отображения")
+
+        Rel(ApiGateway, DeviceExchangeService, "Команды\n управления\n пользователя", "GRPC")
+        Rel(DeviceExchangeService, Queue, "Телеметрия", "PUBLISH" )
+        Rel(DeviceExchangeService, extDevices, "Команды\n управления", "DEVICE FORMAT", "user,\n scenario")
+        Rel(extDevices, DeviceExchangeService, "Телеметрия", "DEVICE FORMAT")
+        Rel(DeviceExchangeService, DeviceExchangeDB, "Конфигурая\n датчиков\n CRUD", "SQL")
+        Rel(DeviceScenarioService, DeviceExchangeService, "Команды\n управления\n по сценарию", "GRPC")
+        Rel(ApiGateway, DeviceScenarioService, "Сценарии\n управления\n CRUD", "GRPC")
+        Rel(Queue, DeviceScenarioService, "Телеметрия\n для сценария", "SUB")
+        Rel(DeviceScenarioService, DeviceScenarioDB, "Сценарии\n управления\n CRUD", "SQL")
+
+        Rel(ApiGateway, TelemetryService, "Телеметрия\n Чтение архива", "GRPC")
+        Rel(Queue, TelemetryService, "Телеметрия\n для записи архива", "SUB")
+        Rel(TelemetryService, TelemetryDB, "Write/Read", "SQL")
+
+        Rel(ApiGateway, UserProjectMonitoringService, "Проект дома\n CRUD", "GRPC")
+        Rel_D(UserProjectMonitoringService, UserProjectMonitoringDB, "Проект дома\n CRUD", "SQL")
+        Rel(UserProjectMonitoringService, DeviceExchangeService, "Конфигурая датчиков\n по проекту\n CRUD", "GRPC")
+    }
+
+
+
+    Container_Boundary(UserSaasSystem, "UserSaas") {
+
+        Container(Auth, "Auth Service", "Авторизация, аутентификация")
+        Container(UserProfile, "UserProfile Service", "Java", "Управление профилями, хранение ")
+        ContainerDb(UserProfileDataBase, "UserProfile DB", "PostgreSQL", "Информация пользователей")
+
+        Container(PaymentService, "Payment Service\n EventSourcing", "Java", "Управление оплатами")
+        ContainerDb(PaymentDB, "Payment DB", "PostgreSQL time series", "Данные об оплатах")
+
+        Container(TechSupportService, "TechSupport Service", "Java", "Управление задачами техподдержки")
+        ContainerDb(TechSupportDB, "TechSupport DB", "MongoDB", "Тикеты техподдержки")
+
+        Rel(ApiGateway, Auth, "Авторизация\n проверка доступа", "GRPC")
+        Rel(ApiGateway, UserProfile, "Пользователи\n CRUD", "GRPC")
+
+        Rel(UserProfile, UserProfileDataBase, "CRUD", "SQL")
+
+        Rel(UserProfile, PaymentService, "CRUD", "SQL")
+        Rel(PaymentService, PaymentDB, "Read/Write", "SQL")
+        Rel(PaymentService, Payment, "Проведение оплаты", "SQL")
+
+        Rel(ApiGateway, TechSupportService, "Задачи\n техподдержки\n CRUD ", "GRPC")
+        Rel(TechSupportService, TechSupportDB, "Write/Read", "SQL")
+    }
+}
+
+@enduml
