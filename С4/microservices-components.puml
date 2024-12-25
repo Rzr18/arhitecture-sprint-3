@@ -7,6 +7,8 @@ top to bottom direction
 
 SystemQueue(Queue, "Kafka Queue", "Очередь сообщений. Pub/Sub model")
 
+Container(ApiGateway, "API Gateway")
+
 System_Ext(extDevices, "Датчики", "Контроллеры управления и измерения")
     
     ContainerDb(DeviceExchangeDB, "DeviсeExchange DB", "PostgreSQL", "Информация о датчиках, адресация")
@@ -27,10 +29,9 @@ System_Ext(extDevices, "Датчики", "Контроллеры управле�
         Rel_U(DeviceConfigRepository, DeviceControlWorker, "Конфигурая\n контроллеров\n")
         Rel(extDevices, DeviceReadWorker, "Телеметрия", "DEVICE FORMAT")
         Rel(DeviceControlController, DeviceControlWorker, "Команды\n управления")
-        Rel(Queue, DeviceControlController, "Команды\n управления", "JSON", "user,\n scenario")
-        Rel(Queue, DeviceConfigController, "Конфигурая\n датчиков\n из проекта\n CRUD", "JSON", "UserProject")
+        Rel(ApiGateway, DeviceControlController, "Команды\n управления\n пользователя", "GRPC")
         Rel_U(DeviceReadWorker, TelemetryPublisher, "Телеметрия" )
-        Rel_U(TelemetryPublisher, Queue, "Телеметрия", "JSON|ASYNC" )
+        Rel_U(TelemetryPublisher, Queue, "Телеметрия", "PUBLISH" )
         Rel_D(DeviceControlWorker, extDevices, "Команды\n управления", "DEVICE FORMAT", "user,\n scenario")   
     }
         
@@ -46,14 +47,14 @@ System_Ext(extDevices, "Датчики", "Контроллеры управле�
         Component(DeviceScenarioWorker, "DeviceScenarioWorker", "Анализ телеметрии, выполнение сценариев")
         Component(DeviceScenarioRepository, "DeviceScenarioRepository", "Операции с БД")
 
-        Rel(Queue, DeviceScenarioController, "Сценарии\n управления\n CRUD", "JSON")
-        Rel(Queue, DevScenTelemetrySubscriber, "Телеметрия", "JSON|ASYNC")
+        Rel(ApiGateway, DeviceScenarioController, "Сценарии\n управления\n CRUD", "GRPC")
+        Rel(Queue, DevScenTelemetrySubscriber, "Телеметрия\n для сценариев", "SUB")
         Rel_D(DevScenTelemetrySubscriber, DeviceScenarioWorker, "Телеметрия")
         Rel(DeviceScenarioController, DeviceScenarioRepository, "Сценарии\n управления\n CRUD")
         Rel(DeviceScenarioRepository, DeviceScenarioDB, "Сценарии\n управления\n CRUD", "SQL")
         Rel_U(DeviceScenarioRepository, DeviceScenarioWorker, "Сценарии\n управления")
         Rel_U(DeviceScenarioWorker, CmndCtrlSender, "Команды\n управления")
-        Rel_U(CmndCtrlSender, Queue, "Команды\n управления", "JSON", "scenario")
+        Rel_D(CmndCtrlSender, DeviceControlController, "Команды\n управления\n по сценарию", "GRPC")
     }
 
     ContainerDb(UserProjectMonitoringDB, "UserProject DB", "PostgreSQL", "Проект дома, схемы отображения")
@@ -66,12 +67,12 @@ System_Ext(extDevices, "Датчики", "Контроллеры управле�
         Component(UserPojectRepository, "UserPojectRepository", "Операции с БД")
         
         Lay_D(ControllersUP, UserPojectLogic)
-        Rel_D(Queue, UserPojectController, "Проект дома\n CRUD", "JSON")
+        Rel_D(ApiGateway, UserPojectController, "Проект дома\n CRUD", "GRPC")
         Rel_D(UserPojectController, UserPojectLogic, "Проект дома\n CRUD")
         Rel(UserPojectLogic, UserPojectRepository, "Проект дома\n CRUD")
         Rel_D(UserPojectRepository, UserProjectMonitoringDB, "Проект дома\n CRUD", "SQL")
         Rel(UserPojectLogic, DeviceCfgSender, "Конфигурая датчиков\n по проекту\n CRUD")
-        Rel(DeviceCfgSender, Queue, "Конфигурая датчиков\n по проекту\n CRUD", "JSON")
+        Rel(DeviceCfgSender, DeviceConfigController, "Конфигурая датчиков\n по проекту\n CRUD", "GRPC")
     }
 
     ContainerDb(TelemetryDB, "Telemetry DB", "PostreSQL time series", "Архив телеметрии")
@@ -82,8 +83,8 @@ System_Ext(extDevices, "Датчики", "Контроллеры управле�
         }
         Component(TelemetryRepository, "TelemetryRepository", "Операции с БД")
 
-        Rel(Queue, TelemetrySubscriber, "Телеметрия", "JSON|ASYNC")
-        BiRel(Queue, TelemetryController, "Телеметрия\n запрос архива", "JSON", )
+        Rel(Queue, TelemetrySubscriber, "Телеметрия\n для записи архива", "SUB")
+        BiRel(ApiGateway, TelemetryController, "Телеметрия\n чтение архива", "GRPC" )
         Rel_U(TelemetryRepository, TelemetryController, "Чтение архива")
         Rel_D(TelemetrySubscriber, TelemetryRepository, "Телеметрия запись")
         BiRel(TelemetryRepository, TelemetryDB, "Write/Read", "SQL")

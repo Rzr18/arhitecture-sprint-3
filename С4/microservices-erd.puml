@@ -28,6 +28,7 @@ entity Device {
     + id
     + project_id
     + type_id
+    + state 
     --
     * address
     * protocol
